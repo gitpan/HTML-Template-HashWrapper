@@ -1,8 +1,8 @@
 package HTML::Template::HashWrapper;
 use strict;
-use Carp;
+use Carp 'croak';
 
-our $VERSION = '1.0';
+our $VERSION = '1.2';
 
 sub new {
   my $class = shift;
@@ -11,29 +11,28 @@ sub new {
     croak "Wrapped object is not a hash reference";
   }
   my %args = @_;
-  my $ref_to_bless;
-  my $at_isa;
-  if ( $args{nobless} ) {
-    $at_isa = 'HTML::Template::HashWrapper::Plain';
-    $ref_to_bless = \$wrapped;
-  } else {
-    $at_isa = $class;
-    $ref_to_bless = $wrapped;
-  }
-  my $uniq = "ANON_".$$.time().int(rand()*10000);
-  my $pkgname = "$ {class}::$ {uniq}";
+  my $at_isa = $class;
+  my $pkgname = $class->_GENERATE_PACKAGENAME();
   if ( UNIVERSAL::isa( $wrapped, 'UNIVERSAL' ) ) {
     # $wrapped is already blessed: add its ref to @ISA
     $at_isa .= " " . ref($wrapped);
   }
   eval "{package $pkgname; use strict; our \@ISA=qw($at_isa); 1;}";
   die $@ if $@;
-  return bless $ref_to_bless, $pkgname;
+  return bless $wrapped, $pkgname;
 }
 
-# XXX according to H::T, param() can also support:
-#     set multiple params: hash input
-#     set multuple params from a hashref input
+# If you don't like my anonymous packagename generation, you can roll your own.
+sub _GENERATE_PACKAGENAME {
+  my $class = shift;
+  my $uniq = "ANON_".$$.time().int(rand()*10000);
+  my $pkgname = "$ {class}::$ {uniq}";
+  return $pkgname;
+}
+
+# todo: according to H::T, param() can also support:
+#       set multiple params: hash input
+#       set multuple params from a hashref input
 
 # Standard behavior: $self is a hashref
 sub param {
@@ -54,20 +53,31 @@ sub param {
 1;
 
 package HTML::Template::HashWrapper::Plain;
-our @ISA=('HTML::Template::HashWrapper');
+use strict;
+use Carp 'croak';
+our @ISA=('HTML::Template::HashWrapper'); # everything is overridden, though
 
-# Un-reblessing behavior: $self is a hashref-ref
+sub new {
+  my $class = shift;
+  my $target = shift;
+  unless ( UNIVERSAL::isa($target, 'HASH') ) {
+    croak "Wrapped object is not a hash reference";
+  }
+  return bless { _ref => $target }, $class;
+}
+
+# Un-reblessing behavior: $self contains a reference to the reference
 sub param {
   my $self = shift;
   my($name, $value) = @_;
   if ( defined($name) ) { 
     if (defined($value)) {
-      return $ {$self}->{$name} = $value;
+      return $self->{_ref}->{$name} = $value;
     } else {
-      return $ {$self}->{$name};
+      return $self->{_ref}->{$name};
     }
   } else {
-    return keys %{$$self};
+    return keys %{ $self->{_ref} };
   }
 }
 
@@ -129,30 +139,57 @@ hash.
 
 =back
 
-By default, HTML::Template::HashWrapper works by re-blessing the input
-object (or blessing, if the input is an unblessed hash reference) into
-a new package which extends the original package and provides an
-implementation of C<param()>.  If for some reason the input reference
-cannot be re-blessed, you may create the wrapper with this form of C<new()>:
+C<new()> will die if given something which is not a hash reference as
+an argument.
 
-    $wrapper = HTML::Template::HashWrapper->new( $obj, nobless => 1 );
+The object returned by C<$new> retains its identity with its original
+class, so you can continue to use the object as normal (call its
+methods, etc).
 
-The C<nobless> option will force HashWrapper to create a new object,
-but leave the original reference in its original state of blessing.
+=head2 Internals
 
-In either case, all methods on the original object's class can be
-called on the newly created object.
+HTML::Template::HashWrapper works by re-blessing the input object (or
+blessing it, if the input is an unblessed hash reference) into a new
+package which extends the original package and provides an
+implementation of C<param()>.
 
-=head1 NOTES
+If for some reason the input reference cannot be re-blessed (for
+example, you're using someone else's code which checks C<ref($orig)>
+when it should be using C<isa()>), you may use
+HTML::Template::HashWrapper::Plain:
+
+    $wrapper = HTML::Template::HashWrapper::Plain->new( $obj );
+
+The C<Plain> wrapper object provides only the compliant C<param()> method,
+but not any of the original object's methods.  The original object is
+left completely untouched.  Most of the time this will be unneccesary.
+
+For purposes of testing the object type,
+HTML::Template::HashWrapper::Plain C<isa> HTML::Template::HashWrapper.
+
+HashWrapper works by creating an unique package whose C<@ISA> includes
+both HashWrapper and the original package (if there is one) of the
+wrapped object.
+
+If you don't like the way the unique package names are generated, you
+can override C<_GENERATE_PACKAGENAME()>.  Be aware that you will see
+strange behavior if this method does not return unique values (for a
+sufficient definition of "unique").
+
+Should you desire to subclass HashWrapper, you may wish to also
+subclass HashWrapper::Plain, which manages its state slightly
+differently.
+
+=head1 OTHER
 
 In theory, C<param()> should also support setting multiple parameters
 by passing in a hash or hash reference.  This interface currently does
 not support that, but HTML::Template only uses the two supported
 forms.
 
-Should you decide to subclass HTML::Template::HashWrapper, be aware
-that in the C<nobless> case, the package name for the base class is
-hardcoded.
+It should be possible to make this more efficient by memoizing the
+pairs of base package names, at the expense of some space for the
+mapping.
 
 =head1 AUTHOR
 
