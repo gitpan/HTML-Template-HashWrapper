@@ -1,0 +1,6 @@
+Revision history for Perl extension HashWrapper.
+
+0.01  Sun Dec 21 13:08:29 2003
+	- original version; created by h2xs 1.22 with options
+		-n HashWrapper -O -P -X -A
+
