@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 use Test::More tests => 109;
-use Test::Exception;
+#use Test::Exception;
 
 BEGIN {
   use_ok( 'HTML::Template::HashWrapper' );
@@ -27,15 +27,26 @@ BEGIN {
   our @ISA = qw( HTML::Template::HashWrapper::Plain );
 }
 
-foreach my $test_class ( 'HTML::Template::HashWrapper',
-			 'Temp::MySubclass'
-		       ) {
+my @test_classes = ( 'HTML::Template::HashWrapper',
+		     'Temp::MySubclass',
+		   );
+
+foreach my $test_class (@test_classes) {
   blessed_hashref_tests       ( $test_class );
-  blessed_bogus_input_tests   ( $test_class );
   blessed_object_tests        ( $test_class );
   unblessed_hashref_tests     ( $test_class );
-  unblessed_bogus_input_tests ( $test_class );
   unblessed_object_tests      ( $test_class );
+}
+
+# Run the bogus tests only if we have test::exception available
+SKIP: {
+  eval "require Test::Exception";
+  skip( "Test::Exception not installed", 4*@test_classes ) if $@;
+
+  foreach my $test_class (@test_classes) {
+    blessed_bogus_input_tests   ( $test_class );
+    unblessed_bogus_input_tests ( $test_class );
+  }
 }
 
 subclass_tests();
@@ -88,9 +99,11 @@ sub blessed_bogus_input_tests {
 
   # new(non-hashref) should result in death
   foreach my $bogus( 251, [2,5,1,5,0,4,9] ) {
-    dies_ok {
-      my $x = $CLASSNAME->new($bogus);
-    } "not allowed: wrapping $bogus";
+    Test::Exception::dies_ok( sub {
+				my $x = $CLASSNAME->new($bogus);
+			      },
+			      "not allowed: wrapping $bogus"
+			    );
   }
 }
 
@@ -159,9 +172,12 @@ sub unblessed_bogus_input_tests {
 
   # new(non-hashref) should result in death - unchanged for nobless
   foreach my $bogus( 251, [2,5,1,5,0,4,9] ) {
-    dies_ok {
-      my $x = HTML::Template::HashWrapper::Plain->new($bogus);
-    } "not allowed: wrapping $bogus";
+    Test::Exception::dies_ok
+	( sub {
+	    my $x = HTML::Template::HashWrapper::Plain->new($bogus);
+	  },
+	  "not allowed: wrapping $bogus"
+	);
   }
 }
 

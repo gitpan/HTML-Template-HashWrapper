@@ -5,10 +5,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'NAME'		=> 'HTML::Template::HashWrapper',
     'VERSION_FROM'	=> 'lib/HTML/Template/HashWrapper.pm', # finds $VERSION
-    'PREREQ_PM'		=> {
-			    Test::Exception => 0,
-			   },
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
-      (#ABSTRACT_FROM => 'HashWrapper.pm', # retrieve abstract from module
+      ('ABSTRACT_FROM'	=> 'lib/HTML/Template/HashWrapper.pm',
        AUTHOR     => 'Greg Fast <gdf@speakeasy.net>') : ()),
 );

@@ -2,7 +2,7 @@ package HTML::Template::HashWrapper;
 use strict;
 use Carp 'croak';
 
-our $VERSION = '1.2';
+our $VERSION = '1.3';
 
 sub new {
   my $class = shift;
